@@ -1,10 +1,15 @@
+import 'dart:isolate';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:poc_player/bloc/video_manager_bloc.dart';
 import 'package:video_player/video_player.dart';
+import 'package:flutter/material.dart';
+import 'dart:async';
 
 class VidepoPlayer extends StatefulWidget {
-  const VidepoPlayer({Key key, this.url, this.play = false}) : super(key: key);
-  final String url;
-  final bool play;
+  const VidepoPlayer({Key key, this.videoManager}) : super(key: key);
+  final VideoManager videoManager;
   @override
   _VidepoPlayerState createState() => _VidepoPlayerState();
 }
@@ -19,25 +24,40 @@ class _VidepoPlayerState extends State<VidepoPlayer> {
   }
 
   _init() async {
-    _controller = VideoPlayerController.network(
-      widget.url ??
-          'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
-      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-    );
-
-    await _controller.initialize();
-    await _controller.setLooping(true);
+    _controller = widget.videoManager.videoPlayerController;
+    if (widget.videoManager.videoPlayerController != null) {
+      if (!_controller?.value?.isInitialized ?? true) {
+        try {
+          await _controller?.initialize();
+          if (widget.videoManager.play) await _controller.play();
+          setState(() {});
+        } catch (e) {
+          print(e);
+        }
+      }
+    }
+    setState(() {});
   }
 
   @override
   didUpdateWidget(VidepoPlayer oldWidget) {
-    if (_controller != null) {
-      if (widget.play) {
-        _controller.play();
-      } else {
-        _controller.pause();
-      }
+    if (oldWidget != widget) {
+      _init();
     }
+    if (_controller != null) {
+      if (widget.videoManager.play) {
+        if (_controller.value.isInitialized) _controller.play();
+        setState(() {});
+      } else {
+        if (!_controller.value.isInitialized ?? true) {
+          return;
+        }
+        if (_controller.value.isInitialized && _controller.value.isPlaying)
+          _controller.pause();
+      }
+      setState(() {});
+    }
+
     super.didUpdateWidget(oldWidget);
   }
 
@@ -49,31 +69,53 @@ class _VidepoPlayerState extends State<VidepoPlayer> {
 
   @override
   void deactivate() {
-    _controller?.dispose();
+    // _controller?.dispose();
     super.deactivate();
   }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        children: <Widget>[
-          Container(
-            child: AspectRatio(
-              aspectRatio: MediaQuery.of(context).size.width /
-                  MediaQuery.of(context).size.height,
-              child: Stack(
-                alignment: Alignment.bottomCenter,
-                fit: StackFit.expand,
-                children: <Widget>[
-                  VideoPlayer(_controller),
-                  _ControlsOverlay(controller: _controller),
-                ],
-              ),
-            ),
+    print(widget.videoManager.videoPlayerController);
+    if (_controller == null)
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
           ),
         ],
-      ),
+      );
+    return Column(
+      children: <Widget>[
+        Container(
+          child: AspectRatio(
+            aspectRatio: MediaQuery.of(context).size.width /
+                MediaQuery.of(context).size.height,
+            child: Stack(
+              alignment: Alignment.bottomCenter,
+              fit: StackFit.passthrough,
+              children: <Widget>[
+                RepaintBoundary(child: VideoPlayer(_controller)),
+                IconButton(
+                    icon: !_controller.value.isPlaying
+                        ? Icon(
+                            Icons.play_arrow,
+                            size: 80,
+                            color: Colors.white,
+                          )
+                        : Container(),
+                    onPressed: () async {
+                      if (!_controller.value.isPlaying)
+                        await _controller.play();
+                      else
+                        await _controller.pause();
+                      setState(() {});
+                    })
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

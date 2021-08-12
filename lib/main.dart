@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'bloc/video_manager_bloc.dart';
 import 'home_page.dart';
 
 void main() {
@@ -32,7 +34,12 @@ class LandingPage extends StatelessWidget {
             TextButton(
                 onPressed: () {
                   Navigator.push(
-                      context, MaterialPageRoute(builder: (c) => HomePage()));
+                      context,
+                      MaterialPageRoute(
+                          builder: (c) => BlocProvider<VideoManagerBloc>(
+                                create: (context) => VideoManagerBloc(),
+                                child: HomePage(),
+                              )));
                 },
                 child: Text("Start"))
           ],
